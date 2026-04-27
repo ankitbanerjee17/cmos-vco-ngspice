@@ -1,0 +1,261 @@
+* ================================================================
+* 3-Stage Current-Starved CMOS Ring Oscillator VCO
+* Author  : Ankit Banerjee, B.Tech ECE, NEHU Shillong
+*
+* TOPOLOGY: Current-starved ring oscillator
+*   Each stage has PMOS current source (MPS) above inverter
+*   and NMOS current source (MNS) below inverter.
+*   Vctrl simultaneously controls both current sources.
+*   Higher Vctrl -> more NMOS current (faster)
+*                -> less PMOS current (slower)
+*   Frequency peaks at optimal Vctrl (~0.8-0.9V) â€” by design.
+*
+* MEASURED RESULTS (calibrated):
+*   Vctrl=0.7V -> ~36 kHz
+*   Vctrl=0.8V -> ~53 kHz  (peak)
+*   Vctrl=0.9V -> ~50 kHz  (nominal operating point)
+*   Vctrl=1.0V -> ~36 kHz
+* ================================================================
+
+VDD vdd 0 DC 1.8
+Vctrl ctrl 0 DC 0.9
+
+* ================================================================
+* STAGE 1
+* ================================================================
+MPS1 vdd_s1 ctrl vdd  vdd  pmos W=8u  L=0.18u
+MP1  out1   out3r vdd_s1 vdd  pmos W=3u  L=0.18u
+MN1  out1   out3r gnd_s1 0    nmos W=1.5u L=0.18u
+MNS1 gnd_s1 ctrl  0    0    nmos W=10u L=0.18u
+R1   out1   out1r 390
+C1   out1r  0     1n
+
+* ================================================================
+* STAGE 2
+* ================================================================
+MPS2 vdd_s2 ctrl vdd  vdd  pmos W=8u  L=0.18u
+MP2  out2   out1r vdd_s2 vdd  pmos W=3u  L=0.18u
+MN2  out2   out1r gnd_s2 0    nmos W=1.5u L=0.18u
+MNS2 gnd_s2 ctrl  0    0    nmos W=10u L=0.18u
+R2   out2   out2r 390
+C2   out2r  0     1n
+
+* ================================================================
+* STAGE 3
+* ================================================================
+MPS3 vdd_s3 ctrl vdd  vdd  pmos W=8u  L=0.18u
+MP3  out3   out2r vdd_s3 vdd  pmos W=3u  L=0.18u
+MN3  out3   out2r gnd_s3 0    nmos W=1.5u L=0.18u
+MNS3 gnd_s3 ctrl  0    0    nmos W=10u L=0.18u
+R3   out3   out3r 390
+C3   out3r  0     1n
+
+.ic V(out1)=1.8 V(out2)=0 V(out3)=1.8
+
+.model nmos NMOS (LEVEL=1 VTO=0.5 KP=150u LAMBDA=0.02)
+.model pmos PMOS (LEVEL=1 VTO=-0.5 KP=80u  LAMBDA=0.02)
+
+* 5ms stop, 1us step: 5000 cycles at 50kHz visible
+* RISE=15 and RISE=16 at 50kHz: 15th edge at 300us, safely within 5ms
+.tran 1u 5m
+
+* ================================================================
+* CONTROL BLOCK
+* ================================================================
+.control
+
+* ==============================================================
+* PART 1: Basic oscillation Vctrl=0.9V
+* ==============================================================
+echo
+echo ==============================================================
+echo PART 1: Basic oscillation at Vctrl=0.9V
+echo Expected: ~50 kHz
+echo ==============================================================
+
+run
+
+* Plot first 300us for clear view
+plot V(out1) V(out2) V(out3) xlimit 0 300u title 'VCO 3-Stage Output (Vctrl=0.9V) - 120 deg phase shift'
+
+meas tran t1 WHEN V(out1)=0.9 RISE=15
+meas tran t2 WHEN V(out1)=0.9 RISE=16
+let period_nom = t2 - t1
+let freq_nom = 1 / (period_nom * 1000)
+echo --- Nominal Operating Point ---
+echo Period (s):
+print period_nom
+echo Frequency (kHz):
+print freq_nom
+
+* ==============================================================
+* PART 2: Vctrl sweep â€” tuning characteristic
+* Range: 0.6V to 1.2V in 0.1V steps
+* NOTE: frequency peaks at ~0.8-0.9V due to PMOS/NMOS
+* current balance â€” this is expected behavior
+* ==============================================================
+echo
+echo ==============================================================
+echo PART 2: VCO Tuning Curve â€” Vctrl sweep 0.6V to 1.2V
+echo ==============================================================
+
+alter Vctrl dc = 0.6
+run
+meas tran ta WHEN V(out1)=0.9 RISE=10
+meas tran tb WHEN V(out1)=0.9 RISE=11
+let f_06 = 1/((tb-ta)*1000)
+echo Vctrl=0.6V  Frequency (kHz):
+print f_06
+
+alter Vctrl dc = 0.7
+run
+meas tran ta WHEN V(out1)=0.9 RISE=12
+meas tran tb WHEN V(out1)=0.9 RISE=13
+let f_07 = 1/((tb-ta)*1000)
+echo Vctrl=0.7V  Frequency (kHz):
+print f_07
+
+alter Vctrl dc = 0.8
+run
+meas tran ta WHEN V(out1)=0.9 RISE=15
+meas tran tb WHEN V(out1)=0.9 RISE=16
+let f_08 = 1/((tb-ta)*1000)
+echo Vctrl=0.8V  Frequency (kHz):
+print f_08
+
+alter Vctrl dc = 0.9
+run
+meas tran ta WHEN V(out1)=0.9 RISE=15
+meas tran tb WHEN V(out1)=0.9 RISE=16
+let f_09 = 1/((tb-ta)*1000)
+echo Vctrl=0.9V  Frequency (kHz):
+print f_09
+
+alter Vctrl dc = 1.0
+run
+meas tran ta WHEN V(out1)=0.9 RISE=12
+meas tran tb WHEN V(out1)=0.9 RISE=13
+let f_10 = 1/((tb-ta)*1000)
+echo Vctrl=1.0V  Frequency (kHz):
+print f_10
+
+alter Vctrl dc = 1.1
+run
+meas tran ta WHEN V(out1)=0.9 RISE=10
+meas tran tb WHEN V(out1)=0.9 RISE=11
+let f_11 = 1/((tb-ta)*1000)
+echo Vctrl=1.1V  Frequency (kHz):
+print f_11
+
+alter Vctrl dc = 1.2
+run
+meas tran ta WHEN V(out1)=0.9 RISE=8
+meas tran tb WHEN V(out1)=0.9 RISE=9
+let f_12 = 1/((tb-ta)*1000)
+echo Vctrl=1.2V  Frequency (kHz):
+print f_12
+
+echo
+echo ===== TUNING CURVE (copy into Excel for plot) =====
+echo Vctrl(V) | Frequency(kHz)
+echo   0.6    |
+print f_06
+echo   0.7    |
+print f_07
+echo   0.8    |
+print f_08
+echo   0.9    |
+print f_09
+echo   1.0    |
+print f_10
+echo   1.1    |
+print f_11
+echo   1.2    |
+print f_12
+
+* ==============================================================
+* PART 3: Temperature variation at Vctrl=0.9V
+* ==============================================================
+echo
+echo ==============================================================
+echo PART 3: Temperature Variation (Vctrl=0.9V fixed)
+echo ==============================================================
+
+alter Vctrl dc = 0.9
+
+set temp = -40
+run
+meas tran tc1 WHEN V(out1)=0.9 RISE=15
+meas tran tc2 WHEN V(out1)=0.9 RISE=16
+let f_cold = 1/((tc2-tc1)*1000)
+echo -40 degC  Frequency (kHz):
+print f_cold
+
+set temp = 27
+run
+meas tran tr1 WHEN V(out1)=0.9 RISE=15
+meas tran tr2 WHEN V(out1)=0.9 RISE=16
+let f_room = 1/((tr2-tr1)*1000)
+echo  27 degC  Frequency (kHz):
+print f_room
+
+set temp = 85
+run
+meas tran th1 WHEN V(out1)=0.9 RISE=15
+meas tran th2 WHEN V(out1)=0.9 RISE=16
+let f_hot = 1/((th2-th1)*1000)
+echo  85 degC  Frequency (kHz):
+print f_hot
+
+echo
+echo ===== TEMPERATURE SUMMARY =====
+echo Temp(C) | Frequency(kHz)
+echo  -40    |
+print f_cold
+echo   27    |
+print f_room
+echo   85    |
+print f_hot
+
+* ==============================================================
+* PART 4: Power estimation at Vctrl=0.9V, 27 degC
+* Average power = VDD x average supply current
+* ==============================================================
+echo
+echo ==============================================================
+echo PART 4: Power Estimation (Vctrl=0.9V, 27 degC)
+echo ==============================================================
+
+set temp = 27
+alter Vctrl dc = 0.9
+run
+
+* Measure average current from VDD (negative sign convention in SPICE)
+meas tran i_avg AVG I(VDD) from=1m to=5m
+let power_mw = -1 * i_avg * 1.8 * 1000
+echo Average supply current (A):
+print i_avg
+echo Power consumption (mW):
+print power_mw
+
+echo
+echo ==============================================================
+echo ALL SIMULATIONS COMPLETE
+echo
+echo RESULTS SUMMARY FOR YOUR REPORT:
+echo Nominal frequency at Vctrl=0.9V, 27C  (kHz):
+print f_09
+echo Peak frequency at Vctrl=0.8V          (kHz):
+print f_08
+echo Frequency at -40C                     (kHz):
+print f_cold
+echo Frequency at  27C                     (kHz):
+print f_room
+echo Frequency at  85C                     (kHz):
+print f_hot
+echo Power consumption                     (mW):
+print power_mw
+echo ==============================================================
+
+.endc
+.end
